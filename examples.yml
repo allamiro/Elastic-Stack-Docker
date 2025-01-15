@@ -293,7 +293,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-
   kafka01:
     profiles: ["kafka"]
     image: confluentinc/cp-kafka:7.8.0
@@ -315,3 +314,5 @@ services:
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "9092"]
       interval: 10s 
+      timeout: 10s
+      retries: 5
