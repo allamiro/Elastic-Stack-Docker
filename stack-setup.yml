@@ -77,10 +77,78 @@ services:
           "    ip:\n"\
           "      - 127.0.0.1\n"\
           "      - ${DOCKER_HOST_IP}\n"\
+          "  - name: kafka-controller-1\n"\
+          "    dns:\n"\
+          "      - kafka-controller-1\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "      - ${DOCKER_HOST_IP}\n"\
+          "  - name: kafka-controller-2\n"\
+          "    dns:\n"\
+          "      - kafka-controller-2\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "      - ${DOCKER_HOST_IP}\n"\
+          "  - name: kafka-controller-3\n"\
+          "    dns:\n"\
+          "      - kafka-controller-3\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "      - ${DOCKER_HOST_IP}\n"\
+          "  - name: kafka-broker-1\n"\
+          "    dns:\n"\
+          "      - kafka-broker-1\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "      - ${DOCKER_HOST_IP}\n"\
+          "  - name: kafka-broker-2\n"\
+          "    dns:\n"\
+          "      - kafka-broker-2\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "      - ${DOCKER_HOST_IP}\n"\
+          "  - name: kafka-broker-3\n"\
+          "    dns:\n"\
+          "      - kafka-broker-3\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "      - ${DOCKER_HOST_IP}\n"\
           > config/certs/instances.yml;
           bin/elasticsearch-certutil cert --silent --pem -out config/certs/certs.zip --in config/certs/instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key;
           unzip config/certs/certs.zip -d config/certs;
         fi;
+        echo "Creating Kafka keystores and truststores"
+        # Create CA truststore for Kafka
+        openssl pkcs12 -export -out config/certs/ca/ca.p12 -nokeys -in config/certs/ca/ca.crt -passout pass:${KAFKA_SSL_TRUSTSTORE_PASSWORD};
+        
+        # Create keystores for Kafka controllers
+        for i in 1 2 3; do
+          if [ -f config/certs/kafka-controller-$i/kafka-controller-$i.crt ]; then
+            openssl pkcs12 -export -out config/certs/kafka-controller-$i/kafka-controller-$i.p12 \
+              -inkey config/certs/kafka-controller-$i/kafka-controller-$i.key \
+              -in config/certs/kafka-controller-$i/kafka-controller-$i.crt \
+              -certfile config/certs/ca/ca.crt \
+              -passout pass:${KAFKA_SSL_KEYSTORE_PASSWORD};
+          fi
+        done
+        
+        # Create keystores for Kafka brokers
+        for i in 1 2 3; do
+          if [ -f config/certs/kafka-broker-$i/kafka-broker-$i.crt ]; then
+            openssl pkcs12 -export -out config/certs/kafka-broker-$i/kafka-broker-$i.p12 \
+              -inkey config/certs/kafka-broker-$i/kafka-broker-$i.key \
+              -in config/certs/kafka-broker-$i/kafka-broker-$i.crt \
+              -certfile config/certs/ca/ca.crt \
+              -passout pass:${KAFKA_SSL_KEYSTORE_PASSWORD};
+          fi
+        done
+        
         echo "Setting file permissions"
         chown -R root:root config/certs;
         find . -type d -exec chmod 755 \{\} \;;

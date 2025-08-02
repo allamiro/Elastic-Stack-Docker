@@ -321,16 +321,20 @@ services:
 
 # Kafka demo and Logstash in and out
 # # Logstash_in is configured to ingest data from the logstash_ingest_data folder (Optional) and send it to Kafka topic
+# # Logstash_out is configured to subscribe to the kafka topic and send the data from the elastic
 
   logstash_in:
     profiles:
-      - kafka
+      - kafka-cluster
+    extends:
+      file: elastic-stack.yml
+      service: logstash
     depends_on:
-      es01:
+      kafka-broker-1:
         condition: service_healthy
-      kibana:
+      kafka-broker-2:
         condition: service_healthy
-      kafka01:
+      kafka-broker-3:
         condition: service_healthy
     image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
     container_name: logstash_in
@@ -338,14 +342,15 @@ services:
     user: logstash
     volumes:
       - logstashdata02:/usr/share/logstash/data
-      - "./config/logstash_in.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
+      - certs:/usr/share/logstash/config/certs
+      - "./config/logstash_in_ssl.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
       - "./logstash_ingest_data/:/usr/share/logstash/ingest_data/"
     command: [ "-f", "/usr/share/logstash/pipeline/logstash.conf" ]
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "curl -s --max-time 5 kafka01:9092 -o /dev/null",
+          "curl -s --max-time 5 kafka-broker-1:19092 -o /dev/null || curl -s --max-time 5 kafka-broker-2:19092 -o /dev/null || curl -s --max-time 5 kafka-broker-3:19092 -o /dev/null",
         ]
       interval: 30s
       timeout: 10s
@@ -355,22 +360,26 @@ services:
 
   logstash_out:
     profiles:
-      - kafka
+      - kafka-cluster
     depends_on:
       es01:
         condition: service_healthy
       kibana:
         condition: service_healthy
-      kafka01:
+      kafka-broker-1:
+        condition: service_healthy
+      kafka-broker-2:
+        condition: service_healthy
+      kafka-broker-3:
         condition: service_healthy
     image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
     container_name: logstash_out
     restart: always
     user: logstash
     volumes:
-      - certs:/usr/share/logstash/certs
+      - certs:/usr/share/logstash/config/certs
       - logstashdata03:/usr/share/logstash/data
-      - "./config/logstash_out.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
+      - "./config/logstash_out_ssl.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
     environment:
       - ELASTIC_USER=elastic
       - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}

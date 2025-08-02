@@ -1,5 +1,6 @@
 include:
   - examples.yml
+  - kafka-cluster.yml
 
 volumes:
   certs:

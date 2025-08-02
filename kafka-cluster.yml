@@ -1,0 +1,256 @@
+services:
+  # Kafka Controllers (KRaft mode - no Zookeeper needed)
+  kafka-controller-1:
+    profiles: ["kafka-cluster"]
+    image: apache/kafka:${KAFKA_VERSION}
+    container_name: kafka-controller-1
+    volumes:
+      - certs:/opt/kafka/config/certs
+      - ./config/kafka:/opt/kafka/config/custom
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: controller
+      KAFKA_LISTENERS: CONTROLLER://kafka-controller-1:${KAFKA_CONTROLLER_1_PORT}
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:SSL,SSL:SSL,PLAINTEXT_HOST:SSL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:${KAFKA_CONTROLLER_1_PORT},2@kafka-controller-2:${KAFKA_CONTROLLER_2_PORT},3@kafka-controller-3:${KAFKA_CONTROLLER_3_PORT}
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}
+      # SSL Configuration
+      KAFKA_SSL_KEYSTORE_LOCATION: /opt/kafka/config/certs/kafka-controller-1/kafka-controller-1.p12
+      KAFKA_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      KAFKA_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /opt/kafka/config/certs/ca/ca.p12
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+    depends_on:
+      setup:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka-controller-1:${KAFKA_CONTROLLER_1_PORT} --command-config /opt/kafka/config/custom/ssl-client.properties"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kafka-controller-2:
+    profiles: ["kafka-cluster"]
+    image: apache/kafka:${KAFKA_VERSION}
+    container_name: kafka-controller-2
+    volumes:
+      - certs:/opt/kafka/config/certs
+      - ./config/kafka:/opt/kafka/config/custom
+    environment:
+      KAFKA_NODE_ID: 2
+      KAFKA_PROCESS_ROLES: controller
+      KAFKA_LISTENERS: CONTROLLER://kafka-controller-2:${KAFKA_CONTROLLER_2_PORT}
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:SSL,SSL:SSL,PLAINTEXT_HOST:SSL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:${KAFKA_CONTROLLER_1_PORT},2@kafka-controller-2:${KAFKA_CONTROLLER_2_PORT},3@kafka-controller-3:${KAFKA_CONTROLLER_3_PORT}
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}
+      # SSL Configuration
+      KAFKA_SSL_KEYSTORE_LOCATION: /opt/kafka/config/certs/kafka-controller-2/kafka-controller-2.p12
+      KAFKA_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      KAFKA_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /opt/kafka/config/certs/ca/ca.p12
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+    depends_on:
+      setup:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka-controller-2:${KAFKA_CONTROLLER_2_PORT} --command-config /opt/kafka/config/custom/ssl-client.properties"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kafka-controller-3:
+    profiles: ["kafka-cluster"]
+    image: apache/kafka:${KAFKA_VERSION}
+    container_name: kafka-controller-3
+    volumes:
+      - certs:/opt/kafka/config/certs
+      - ./config/kafka:/opt/kafka/config/custom
+    environment:
+      KAFKA_NODE_ID: 3
+      KAFKA_PROCESS_ROLES: controller
+      KAFKA_LISTENERS: CONTROLLER://kafka-controller-3:${KAFKA_CONTROLLER_3_PORT}
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:SSL,SSL:SSL,PLAINTEXT_HOST:SSL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:${KAFKA_CONTROLLER_1_PORT},2@kafka-controller-2:${KAFKA_CONTROLLER_2_PORT},3@kafka-controller-3:${KAFKA_CONTROLLER_3_PORT}
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}
+      # SSL Configuration
+      KAFKA_SSL_KEYSTORE_LOCATION: /opt/kafka/config/certs/kafka-controller-3/kafka-controller-3.p12
+      KAFKA_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      KAFKA_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /opt/kafka/config/certs/ca/ca.p12
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+    depends_on:
+      setup:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka-controller-3:${KAFKA_CONTROLLER_3_PORT} --command-config /opt/kafka/config/custom/ssl-client.properties"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kafka Brokers
+  kafka-broker-1:
+    profiles: ["kafka-cluster"]
+    image: apache/kafka:${KAFKA_VERSION}
+    container_name: kafka-broker-1
+    ports:
+      - "${KAFKA_BROKER_1_PORT}:9092"
+    volumes:
+      - certs:/opt/kafka/config/certs
+      - ./config/kafka:/opt/kafka/config/custom
+      - kafka-broker-1-data:/opt/kafka/logs
+    environment:
+      KAFKA_NODE_ID: 4
+      KAFKA_PROCESS_ROLES: broker
+      KAFKA_LISTENERS: SSL://kafka-broker-1:19092,PLAINTEXT_HOST://kafka-broker-1:9092
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka-broker-1:19092,PLAINTEXT_HOST://localhost:${KAFKA_BROKER_1_PORT}
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:SSL,SSL:SSL,PLAINTEXT_HOST:SSL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:${KAFKA_CONTROLLER_1_PORT},2@kafka-controller-2:${KAFKA_CONTROLLER_2_PORT},3@kafka-controller-3:${KAFKA_CONTROLLER_3_PORT}
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}
+      # SSL Configuration
+      KAFKA_SSL_KEYSTORE_LOCATION: /opt/kafka/config/certs/kafka-broker-1/kafka-broker-1.p12
+      KAFKA_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      KAFKA_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /opt/kafka/config/certs/ca/ca.p12
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+      # Topic Configuration
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+    depends_on:
+      kafka-controller-1:
+        condition: service_healthy
+      kafka-controller-2:
+        condition: service_healthy
+      kafka-controller-3:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka-broker-1:19092 --command-config /opt/kafka/config/custom/ssl-client.properties"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kafka-broker-2:
+    profiles: ["kafka-cluster"]
+    image: apache/kafka:${KAFKA_VERSION}
+    container_name: kafka-broker-2
+    ports:
+      - "${KAFKA_BROKER_2_PORT}:9092"
+    volumes:
+      - certs:/opt/kafka/config/certs
+      - ./config/kafka:/opt/kafka/config/custom
+      - kafka-broker-2-data:/opt/kafka/logs
+    environment:
+      KAFKA_NODE_ID: 5
+      KAFKA_PROCESS_ROLES: broker
+      KAFKA_LISTENERS: SSL://kafka-broker-2:19092,PLAINTEXT_HOST://kafka-broker-2:9092
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka-broker-2:19092,PLAINTEXT_HOST://localhost:${KAFKA_BROKER_2_PORT}
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:SSL,SSL:SSL,PLAINTEXT_HOST:SSL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:${KAFKA_CONTROLLER_1_PORT},2@kafka-controller-2:${KAFKA_CONTROLLER_2_PORT},3@kafka-controller-3:${KAFKA_CONTROLLER_3_PORT}
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}
+      # SSL Configuration
+      KAFKA_SSL_KEYSTORE_LOCATION: /opt/kafka/config/certs/kafka-broker-2/kafka-broker-2.p12
+      KAFKA_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      KAFKA_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /opt/kafka/config/certs/ca/ca.p12
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+      # Topic Configuration
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+    depends_on:
+      kafka-controller-1:
+        condition: service_healthy
+      kafka-controller-2:
+        condition: service_healthy
+      kafka-controller-3:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka-broker-2:19092 --command-config /opt/kafka/config/custom/ssl-client.properties"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  kafka-broker-3:
+    profiles: ["kafka-cluster"]
+    image: apache/kafka:${KAFKA_VERSION}
+    container_name: kafka-broker-3
+    ports:
+      - "${KAFKA_BROKER_3_PORT}:9092"
+    volumes:
+      - certs:/opt/kafka/config/certs
+      - ./config/kafka:/opt/kafka/config/custom
+      - kafka-broker-3-data:/opt/kafka/logs
+    environment:
+      KAFKA_NODE_ID: 6
+      KAFKA_PROCESS_ROLES: broker
+      KAFKA_LISTENERS: SSL://kafka-broker-3:19092,PLAINTEXT_HOST://kafka-broker-3:9092
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka-broker-3:19092,PLAINTEXT_HOST://localhost:${KAFKA_BROKER_3_PORT}
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:SSL,SSL:SSL,PLAINTEXT_HOST:SSL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-controller-1:${KAFKA_CONTROLLER_1_PORT},2@kafka-controller-2:${KAFKA_CONTROLLER_2_PORT},3@kafka-controller-3:${KAFKA_CONTROLLER_3_PORT}
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      CLUSTER_ID: ${KAFKA_CLUSTER_ID}
+      # SSL Configuration
+      KAFKA_SSL_KEYSTORE_LOCATION: /opt/kafka/config/certs/kafka-broker-3/kafka-broker-3.p12
+      KAFKA_SSL_KEYSTORE_PASSWORD: ${KAFKA_SSL_KEYSTORE_PASSWORD}
+      KAFKA_SSL_KEY_PASSWORD: ${KAFKA_SSL_KEY_PASSWORD}
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /opt/kafka/config/certs/ca/ca.p12
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: ${KAFKA_SSL_TRUSTSTORE_PASSWORD}
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: ""
+      # Topic Configuration
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_NUM_PARTITIONS: 3
+    depends_on:
+      kafka-controller-1:
+        condition: service_healthy
+      kafka-controller-2:
+        condition: service_healthy
+      kafka-controller-3:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions.sh --bootstrap-server kafka-broker-3:19092 --command-config /opt/kafka/config/custom/ssl-client.properties"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  kafka-broker-1-data:
+    driver: local
+  kafka-broker-2-data:
+    driver: local
+  kafka-broker-3-data:
+    driver: local
