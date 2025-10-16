@@ -319,7 +319,7 @@ services:
       - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=SSL
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
       - KAFKA_TLS_TYPE=PEM
-      - KAFKA_TLS_CERTIFICATE_FILE=/certs/kafka/kafka.crt
+      - KAFKA_TLS_CERTIFICATE_FILE=/certs/kafka/kafka.chain.pem
       - KAFKA_TLS_KEY_FILE=/certs/kafka/kafka.key
       - KAFKA_TLS_CA_CERT_FILE=/certs/ca/ca.crt
       - KAFKA_CFG_SSL_CLIENT_AUTH=none

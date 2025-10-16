@@ -89,6 +89,7 @@ services:
           unzip config/certs/certs.zip -d config/certs;
         fi;
         cat config/certs/es01/es01.crt config/certs/ca/ca.crt > config/certs/es01/es01.chain.pem;
+        cat config/certs/kafka/kafka.crt config/certs/ca/ca.crt > config/certs/kafka/kafka.chain.pem;
         echo "Setting file permissions"
         chown -R root:root config/certs;
         find . -type d -exec chmod 755 \{\} \;;

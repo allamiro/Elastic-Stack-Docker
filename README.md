@@ -296,7 +296,7 @@ Adds Filebeat and Logstash for advanced log processing.
 docker compose --profile kafka up -d
 ```
 
-Adds Apache Kafka along with dedicated Logstash pipelines that publish data into Kafka and deliver the messages back into Elasticsearch. The broker is secured with TLS using the stack-generated certificate authority, so clients reuse the shared `certs/` volume. Drop files into the `logstash_ingest_data/` directory to see them flow through Kafka into the `kafka-demo-*` indices.
+Adds Apache Kafka along with dedicated Logstash pipelines that publish data into Kafka and deliver the messages back into Elasticsearch. The broker is secured with TLS using the stack-generated certificate authority, so clients reuse the shared `certs/` volume. During setup the Kafka server certificate is chained with the Elasticsearch CA to keep every service on the same trust path. Drop files into the `logstash_ingest_data/` directory to see them flow through Kafka into the `kafka-demo-*` indices.
 
 > **Tip:** Override the default Kafka settings by adding `KAFKA_PORT` or `KAFKA_TOPIC` entries to your `.env` file before running Docker Compose. The TLS listener defaults to `9093`.
 
