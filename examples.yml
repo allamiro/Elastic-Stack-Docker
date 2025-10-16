@@ -12,6 +12,14 @@ volumes:
     driver: local
   logstashdata01:
     driver: local
+  logstashdata_kafka_in:
+    driver: local
+  logstashdata_kafka_out:
+    driver: local
+  kafkadata01:
+    driver: local
+  zookeeperdata01:
+    driver: local
 
 services:
   # The ml01 is configured to be a dedicated ML node within the cluster large enough to download and install the ELSER model
@@ -277,10 +285,96 @@ services:
         [
           "CMD-SHELL",
           "curl -s --cacert /usr/share/logstash/certs/ca/ca.crt https://es01:9200 | grep -q 'missing authentication credentials'",
-        ]
+      ]
       interval: 10s
       timeout: 10s
       retries: 120
+
+  # Kafka demo profile adds Kafka and two Logstash pipelines to showcase ingesting data through Kafka
+  zookeeper:
+    profiles:
+      - kafka
+    image: bitnami/zookeeper:3.9
+    restart: unless-stopped
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - zookeeperdata01:/bitnami/zookeeper
+
+  kafka:
+    profiles:
+      - kafka
+    image: bitnami/kafka:3.7
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_started
+    ports:
+      - ${KAFKA_PORT:-9093}:9093
+    environment:
+      - KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_LISTENERS=SSL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=SSL://kafka:9093
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=SSL:SSL
+      - KAFKA_CFG_INTER_BROKER_LISTENER_NAME=SSL
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_TLS_TYPE=PEM
+      - KAFKA_TLS_CERTIFICATE_FILE=/certs/kafka/kafka.crt
+      - KAFKA_TLS_KEY_FILE=/certs/kafka/kafka.key
+      - KAFKA_TLS_CA_CERT_FILE=/certs/ca/ca.crt
+      - KAFKA_CFG_SSL_CLIENT_AUTH=none
+    volumes:
+      - certs:/certs
+      - kafkadata01:/bitnami/kafka
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "openssl s_client -connect localhost:9093 -servername kafka -CAfile /certs/ca/ca.crt </dev/null >/dev/null 2>&1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+
+  logstash-kafka-in:
+    profiles:
+      - kafka
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - certs:/usr/share/logstash/certs
+      - logstashdata_kafka_in:/usr/share/logstash/data
+      - "./logstash_ingest_data/:/usr/share/logstash/ingest_data/"
+      - "./config/logstash-kafka-in.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
+    environment:
+      - xpack.monitoring.enabled=false
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9093
+      - KAFKA_TOPIC=${KAFKA_TOPIC:-elastic-logs}
+
+  logstash-kafka-out:
+    profiles:
+      - kafka
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+      es01:
+        condition: service_healthy
+    volumes:
+      - certs:/usr/share/logstash/certs
+      - logstashdata_kafka_out:/usr/share/logstash/data
+      - "./config/logstash-kafka-out.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
+    environment:
+      - xpack.monitoring.enabled=false
+      - ELASTIC_USER=elastic
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - ELASTIC_HOSTS=https://es01:9200
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9093
+      - KAFKA_TOPIC=${KAFKA_TOPIC:-elastic-logs}
 
   # The webapp is an example insturmentation of the elastic APM agent. (Optional)
   # Access the webapp through http://localhost:8000

@@ -290,6 +290,16 @@ docker compose --profile filebeat --profile logstash up -d
 
 Adds Filebeat and Logstash for advanced log processing.
 
+### With Kafka Log Routing Demo
+
+```bash
+docker compose --profile kafka up -d
+```
+
+Adds Apache Kafka along with dedicated Logstash pipelines that publish data into Kafka and deliver the messages back into Elasticsearch. The broker is secured with TLS using the stack-generated certificate authority, so clients reuse the shared `certs/` volume. Drop files into the `logstash_ingest_data/` directory to see them flow through Kafka into the `kafka-demo-*` indices.
+
+> **Tip:** Override the default Kafka settings by adding `KAFKA_PORT` or `KAFKA_TOPIC` entries to your `.env` file before running Docker Compose. The TLS listener defaults to `9093`.
+
 ### Air-Gapped Deployment
 
 ```bash
@@ -651,6 +661,7 @@ docker compose --profile filebeat --profile logstash up -d
 - **Agent Testing**: `docker compose --profile agent up -d` for agent functionality
 - **ML Testing**: `docker compose --profile ml up -d` for machine learning features
 - **Multiple Profiles**: `docker compose --profile apm --profile monitoring --profile filebeat up -d` for comprehensive testing
+- **Kafka Demo**: `docker compose --profile kafka up -d` to route sample files through Kafka into Elasticsearch
 
 ## Contributing
 
