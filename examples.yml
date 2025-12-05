@@ -12,6 +12,12 @@ volumes:
     driver: local
   logstashdata01:
     driver: local
+  kafkadata:
+    driver: local
+  logstash-kafka-in-data:
+    driver: local
+  logstash-kafka-out-data:
+    driver: local
 
 services:
   # The ml01 is configured to be a dedicated ML node within the cluster large enough to download and install the ELSER model
@@ -352,3 +358,190 @@ services:
       - ES_USERNAME=elastic
       - ES_PASSWORD=${ELASTIC_PASSWORD}
       - ES_SSL_SKIP_VERIFY=true
+
+  # ============================================================================
+  # KAFKA PROFILE SERVICES
+  # Architecture: [ Producers/logstash-kafka-in ] --> [ Kafka ] --> [ logstash-kafka-out ] --> [ Elasticsearch ]
+  # Usage: docker compose --profile kafka up -d
+  # ============================================================================
+
+  # Kafka broker using KRaft mode (no Zookeeper required)
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: kafka
+    profiles:
+      - kafka
+    hostname: kafka
+    ports:
+      - ${KAFKA_PORT}:9092
+      - ${KAFKA_EXTERNAL_PORT}:9094
+    environment:
+      # KRaft settings (no Zookeeper)
+      - KAFKA_NODE_ID=0
+      - KAFKA_PROCESS_ROLES=controller,broker
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      # Listener configuration
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,EXTERNAL://${DOCKER_HOST_IP}:${KAFKA_EXTERNAL_PORT}
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      # Topic settings
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_NUM_PARTITIONS=${KAFKA_NUM_PARTITIONS}
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=1
+      # Performance settings
+      - KAFKA_LOG_RETENTION_HOURS=${KAFKA_LOG_RETENTION_HOURS}
+      - KAFKA_LOG_SEGMENT_BYTES=1073741824
+      - KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS=300000
+      # Cluster ID for KRaft
+      - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120
+
+  # Kafka setup service - creates topics on startup
+  kafka-setup:
+    image: apache/kafka:3.9.0
+    container_name: kafka-setup
+    profiles:
+      - kafka
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
+      - KAFKA_NUM_PARTITIONS=${KAFKA_NUM_PARTITIONS}
+    entrypoint: >
+      bash -c "
+        echo 'Waiting for Kafka to be ready...';
+        sleep 5;
+        echo 'Creating Kafka topic: ${KAFKA_TOPIC}';
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic ${KAFKA_TOPIC} --partitions ${KAFKA_NUM_PARTITIONS} --replication-factor 1;
+        echo 'Listing all topics:';
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list;
+        echo 'Topic details:';
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --describe --topic ${KAFKA_TOPIC};
+        echo 'Kafka setup completed successfully!';
+      "
+
+  # Logstash Kafka Producer - reads from files/generator and produces to Kafka
+  logstash-kafka-in:
+    profiles:
+      - kafka
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-setup:
+        condition: service_completed_successfully
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    container_name: logstash-kafka-in
+    restart: unless-stopped
+    labels:
+      co.elastic.logs/module: logstash
+    volumes:
+      - certs:/usr/share/logstash/certs
+      - logstash-kafka-in-data:/usr/share/logstash/data
+      - "./kafka_ingest_data/:/usr/share/logstash/ingest_data/"
+      - "./config/logstash-kafka-in.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
+    environment:
+      - xpack.monitoring.enabled=false
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
+    deploy:
+      resources:
+        limits:
+          cpus: ${LOGSTASH_CPU_LIMIT}
+          memory: ${LOGSTASH_MEM_LIMIT}
+        reservations:
+          cpus: ${LOGSTASH_CPU_LIMIT}
+          memory: ${LOGSTASH_MEM_LIMIT}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s http://localhost:9600/_node/stats | grep -q '\"status\":\"green\"' || curl -s http://localhost:9600/_node/stats | grep -q '\"status\":\"yellow\"'",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 120
+
+  # Logstash Kafka Consumer - consumes from Kafka and sends to Elasticsearch
+  logstash-kafka-out:
+    profiles:
+      - kafka
+    depends_on:
+      es01:
+        condition: service_healthy
+      kibana:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-setup:
+        condition: service_completed_successfully
+    image: docker.elastic.co/logstash/logstash:${STACK_VERSION}
+    container_name: logstash-kafka-out
+    restart: unless-stopped
+    labels:
+      co.elastic.logs/module: logstash
+    volumes:
+      - certs:/usr/share/logstash/certs
+      - logstash-kafka-out-data:/usr/share/logstash/data
+      - "./config/logstash-kafka-out.conf:/usr/share/logstash/pipeline/logstash.conf:ro"
+    environment:
+      - xpack.monitoring.enabled=false
+      - ELASTIC_USER=elastic
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - ELASTIC_HOSTS=https://es01:9200
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
+    deploy:
+      resources:
+        limits:
+          cpus: ${LOGSTASH_CPU_LIMIT}
+          memory: ${LOGSTASH_MEM_LIMIT}
+        reservations:
+          cpus: ${LOGSTASH_CPU_LIMIT}
+          memory: ${LOGSTASH_MEM_LIMIT}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -s http://localhost:9600/_node/stats | grep -q '\"status\":\"green\"' || curl -s http://localhost:9600/_node/stats | grep -q '\"status\":\"yellow\"'",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 120
+
+  # Kafka UI for monitoring and management (Optional but helpful for demos)
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    profiles:
+      - kafka
+    depends_on:
+      kafka:
+        condition: service_healthy
+    ports:
+      - ${KAFKA_UI_PORT}:8080
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=elastic-kafka
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
+      - DYNAMIC_CONFIG_ENABLED=true
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://localhost:8080/actuator/health || exit 1",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 120

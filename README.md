@@ -156,6 +156,26 @@ Profiles are enabled to configure different services for demo/example purposes. 
 - **Endpoint**: MCP server endpoint is available at `http://localhost:8090/mcp`
 - **Use Case**: AI/ML model integration, LLM client communication
 
+#### Kafka Profile (`--profile kafka`)
+
+- **kafka**: Apache Kafka broker using KRaft mode (no Zookeeper required)
+- **kafka-setup**: Initialization container that creates topics on startup
+- **logstash-kafka-in**: Logstash producer that reads from files/generator and sends to Kafka
+- **logstash-kafka-out**: Logstash consumer that reads from Kafka and sends to Elasticsearch
+- **kafka-ui**: Web UI for Kafka monitoring and management
+- **Architecture**:
+
+  ```text
+  [ Producers/logstash-kafka-in ] --> [ Kafka ] --> [ logstash-kafka-out ] --> [ Elasticsearch ] --> [ Kibana ]
+  ```
+
+- **Access**:
+  - Kafka UI: `http://localhost:8082`
+  - Kafka Broker (internal): `kafka:9092`
+  - Kafka Broker (external): `${DOCKER_HOST_IP}:9094`
+- **Data Ingestion**: Drop log files in the `kafka_ingest_data/` folder or use the built-in generator
+- **Use Case**: Event streaming, log aggregation, decoupled data pipelines, high-throughput ingestion
+
 ### Elastic Maps Deployment
 
 - **ems-server**: Elastic Maps Service for geographic data visualization
@@ -303,6 +323,14 @@ docker compose -f docker-compose.yml -f air-gapped.yml up -d
 
 Deploys with offline package and artifact registries.
 
+### With Kafka Pipeline
+
+```bash
+docker compose --profile kafka up -d
+```
+
+Adds Kafka broker with dual Logstash pipeline for event streaming. Data flows: `logstash-kafka-in` → `Kafka` → `logstash-kafka-out` → `Elasticsearch`.
+
 ### Multiple Profiles
 
 ```bash
@@ -437,6 +465,15 @@ The agent profile enables comprehensive container monitoring:
 - **Source**: `./agent_ingest_data/` directory
 - **Integration**: Fleet Server policies
 - **Monitoring**: Real-time data collection
+
+### Kafka Pipeline
+
+- **Source**: `./kafka_ingest_data/` directory
+- **Configuration**: `./config/logstash-kafka-in.conf` (producer), `./config/logstash-kafka-out.conf` (consumer)
+- **Topic**: Configurable via `KAFKA_TOPIC` in `.env` (default: `elastic-logs`)
+- **Index**: Data is indexed to `kafka-logs-*` in Elasticsearch
+- **Demo Generator**: Built-in log generator produces sample JSON logs automatically
+- **Monitoring**: Kafka UI available at `http://localhost:8082`
 
 ## Security Features
 
