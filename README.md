@@ -175,6 +175,27 @@ Profiles are enabled to configure different services for demo/example purposes. 
   - Kafka Broker (external): `${DOCKER_HOST_IP}:9094` (TLS)
 - **Security**: Both client-facing listeners are secured with TLS. The setup service generates a Kafka certificate signed by the stack CA, so all Kafka clients (Logstash, Kafka UI, external consumers) trust the broker through the shared `certs` volume (`ca/ca.crt`). External clients can connect with `security.protocol=SSL` and `ssl.truststore.type=PEM` pointing at a copy of the CA certificate. The broker keystore password defaults to `kafkademo` and can be changed via `KAFKA_SSL_KEYSTORE_PASSWORD` in `.env`
 - **Data Ingestion**: Drop log files in the `kafka_ingest_data/` folder or use the built-in generator
+- **Topics**: The `kafka-setup` container creates topics automatically at startup:
+  - By default it creates the single topic named by `KAFKA_TOPIC` (default `elastic-logs`) with `KAFKA_NUM_PARTITIONS` partitions (default 3). This is the topic the two Logstash pipelines produce to and consume from
+  - To create several topics with different partition counts, set `KAFKA_TOPICS` in `.env` to a comma-separated list where each entry is `name` or `name:partitions`, e.g. `KAFKA_TOPICS=elastic-logs:3,app-metrics:6,security-alerts:1`. Entries without a partition count use `KAFKA_NUM_PARTITIONS`. Include `KAFKA_TOPIC` in the list so the Logstash pipelines still have their topic
+  - `auto.create.topics.enable` is on, so producing to a topic that does not exist yet also creates it with the broker defaults
+  - To manage topics manually, use the Kafka CLI inside the broker container with the generated TLS client config, e.g.:
+
+    ```bash
+    docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 \
+      --command-config /certs/kafka/client-ssl.properties \
+      --create --topic my-topic --partitions 6 --replication-factor 1
+    docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 \
+      --command-config /certs/kafka/client-ssl.properties --list
+    docker exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 \
+      --command-config /certs/kafka/client-ssl.properties --describe --topic my-topic
+    ```
+
+- **Tuning**:
+  - *Producer parameters* (batching, compression, acks, retries, etc.) are set in the `kafka { }` output block of `config/logstash-kafka-in.conf`. The [Logstash Kafka output](https://www.elastic.co/guide/en/logstash/current/plugins-outputs-kafka.html) exposes the common Kafka producer settings as plugin options, e.g. `compression_type => "lz4"`, `batch_size`, `linger_ms`, `buffer_memory`, `max_request_size`
+  - *Consumer parameters* (offsets, polling, group membership, etc.) are set in the `kafka { }` input block of `config/logstash-kafka-out.conf`. The [Logstash Kafka input](https://www.elastic.co/guide/en/logstash/current/plugins-inputs-kafka.html) exposes the common Kafka consumer settings, e.g. `max_poll_records`, `fetch_max_bytes`, `session_timeout_ms`, `consumer_threads`, `group_id`, `auto_offset_reset`
+  - *Broker parameters*: any `server.properties` setting can be passed as an environment variable on the `kafka` service in `examples.yml` by upper-casing it, prefixing `KAFKA_`, and replacing dots with underscores (e.g. `log.retention.hours` becomes `KAFKA_LOG_RETENTION_HOURS`). Frequently changed ones are already wired to `.env`: `KAFKA_TOPIC`, `KAFKA_TOPICS`, `KAFKA_NUM_PARTITIONS`, `KAFKA_LOG_RETENTION_HOURS`
+  - *Other Kafka clients* (console tools, external producers/consumers) can reuse the generated client config in the `certs` volume as shown above; external clients connect to `${DOCKER_HOST_IP}:9094` with `security.protocol=SSL` and a truststore containing the stack CA
 - **Use Case**: Event streaming, log aggregation, decoupled data pipelines, high-throughput ingestion
 
 ### Elastic Maps Deployment

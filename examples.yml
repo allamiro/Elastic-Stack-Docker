@@ -442,18 +442,28 @@ services:
     volumes:
       - certs:/certs:ro
     environment:
+      # KAFKA_TOPICS is a comma-separated list of topics to create, each optionally
+      # with a partition count: "logs:3,metrics:6,alerts". Topics without a count
+      # use KAFKA_NUM_PARTITIONS. Defaults to the single KAFKA_TOPIC used by the
+      # Logstash pipelines.
+      - KAFKA_TOPICS=${KAFKA_TOPICS:-}
       - KAFKA_TOPIC=${KAFKA_TOPIC:-elastic-logs}
       - KAFKA_NUM_PARTITIONS=${KAFKA_NUM_PARTITIONS:-3}
     entrypoint: >
       bash -c "
         echo 'Waiting for Kafka to be ready...';
         sleep 5;
-        echo 'Creating Kafka topic: ${KAFKA_TOPIC:-elastic-logs}';
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --command-config /certs/kafka/client-ssl.properties --create --if-not-exists --topic ${KAFKA_TOPIC:-elastic-logs} --partitions ${KAFKA_NUM_PARTITIONS:-3} --replication-factor 1;
+        for spec in $$(echo $${KAFKA_TOPICS:-$$KAFKA_TOPIC} | tr ',' ' '); do
+          topic=$${spec%%:*};
+          partitions=$${spec##*:};
+          if [ $$partitions = $$topic ]; then partitions=$$KAFKA_NUM_PARTITIONS; fi;
+          echo Creating Kafka topic $$topic with $$partitions partitions;
+          /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --command-config /certs/kafka/client-ssl.properties --create --if-not-exists --topic $$topic --partitions $$partitions --replication-factor 1;
+        done;
         echo 'Listing all topics:';
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --command-config /certs/kafka/client-ssl.properties --list;
         echo 'Topic details:';
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --command-config /certs/kafka/client-ssl.properties --describe --topic ${KAFKA_TOPIC:-elastic-logs};
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --command-config /certs/kafka/client-ssl.properties --describe;
         echo 'Kafka setup completed successfully!';
       "
 
