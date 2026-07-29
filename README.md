@@ -38,6 +38,8 @@ The Elastic Stack (formerly known as the ELK Stack) is a collection of open-sour
 
 This project is broken into multiple docker compose files that build on each other, enabling multiple final configurations when the stack is brought up.
 
+Dataflow and pipeline diagrams for the base stack and every profile are available in [docs/diagrams.md](docs/diagrams.md).
+
 The `docker-compose.yml` is the base configuration of the stack. It generates the certs required and brings online the Elasticsearch nodes, Kibana, and Fleet/APM server. Therefore, it will always be used when issuing the `docker compose up` command.
 
 The `air-gapped.yml` adds to the base configuration provided by the `docker-compose.yml` and provides the configuration changes and containers necessary to run the Elastic stack in an air-gapped environment.
@@ -95,7 +97,7 @@ The `elastic-stack.yml` contains the basic configuration for core Elastic compon
 
 ### Optional Services (Profiles)
 
-Profiles are enabled to configure different services for demo/example purposes. To use a profile add `--profile <name>` to the docker compose command. Each profile enabled must have its own `--profile <name>`, you cannot use a list of comma separated profile names.
+Profiles are enabled to configure different services for demo/example purposes. To use a profile add `--profile <name>` to the docker compose command. Each profile enabled must have its own `--profile <name>`, you cannot use a list of comma separated profile names. See [docs/diagrams.md](docs/diagrams.md) for a dataflow diagram of each profile.
 
 #### Machine Learning Profile (`--profile ml`)
 
