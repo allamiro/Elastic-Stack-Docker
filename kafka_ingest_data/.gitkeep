@@ -1,0 +1,4 @@
+# This directory is used for Kafka demo data ingestion
+# Drop .log files here to have them ingested via logstash-kafka-in -> Kafka -> logstash-kafka-out -> Elasticsearch
+#
+# Example: echo '{"level": "INFO", "message": "Test log entry"}' >> test.log
