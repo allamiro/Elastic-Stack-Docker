@@ -197,6 +197,21 @@ Profiles are enabled to configure different services for demo/example purposes. 
   - *Broker parameters*: any `server.properties` setting can be passed as an environment variable on the `kafka` service in `examples.yml` by upper-casing it, prefixing `KAFKA_`, and replacing dots with underscores (e.g. `log.retention.hours` becomes `KAFKA_LOG_RETENTION_HOURS`). Frequently changed ones are already wired to `.env`: `KAFKA_TOPIC`, `KAFKA_TOPICS`, `KAFKA_NUM_PARTITIONS`, `KAFKA_LOG_RETENTION_HOURS`
   - *Other Kafka clients* (console tools, external producers/consumers) can reuse the generated client config in the `certs` volume as shown above; external clients connect to `${DOCKER_HOST_IP}:9094` with `security.protocol=SSL` and a truststore containing the stack CA
 - **Use Case**: Event streaming, log aggregation, decoupled data pipelines, high-throughput ingestion
+- **Air-Gapped Use**: The profile works with the air-gapped overlay:
+
+  ```bash
+  docker compose -f docker-compose.yml -f air-gapped.yml --profile kafka up -d
+  ```
+
+  Nothing in the profile needs internet access at runtime - the Logstash pipelines use only plugins bundled in the stock Logstash image, and certificates come from the local setup service. The EPR/EAR registries serve Elastic packages and agent binaries, **not container images**, so pre-load the profile's images on the disconnected host along with the rest of the stack's images:
+
+  ```bash
+  # on a connected machine
+  docker save apache/kafka:3.9.0 provectuslabs/kafka-ui:latest \
+    docker.elastic.co/logstash/logstash:${STACK_VERSION} | gzip > kafka-images.tgz
+  # on the air-gapped host
+  docker load < kafka-images.tgz
+  ```
 
 ### Elastic Maps Deployment
 
