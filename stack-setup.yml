@@ -63,6 +63,13 @@ services:
           "    ip:\n"\
           "      - 127.0.0.1\n"\
           "      - ${DOCKER_HOST_IP}\n"\
+          "  - name: kafka\n"\
+          "    dns:\n"\
+          "      - kafka\n"\
+          "      - localhost\n"\
+          "    ip:\n"\
+          "      - 127.0.0.1\n"\
+          "      - ${DOCKER_HOST_IP}\n"\
           "  - name: fleet-server\n"\
           "    dns:\n"\
           "      - fleet-server\n"\
@@ -82,6 +89,30 @@ services:
           unzip config/certs/certs.zip -d config/certs;
         fi;
         cat config/certs/es01/es01.crt config/certs/ca/ca.crt > config/certs/es01/es01.chain.pem;
+        echo -ne \
+        "instances:\n"\
+        "  - name: kafka\n"\
+        "    dns:\n"\
+        "      - kafka\n"\
+        "      - localhost\n"\
+        "    ip:\n"\
+        "      - 127.0.0.1\n"\
+        "      - ${DOCKER_HOST_IP}\n"\
+        > config/certs/kafka-instances.yml;
+        if [ ! -f config/certs/kafka/kafka.crt ]; then
+          echo "Creating Kafka certs from the existing CA";
+          bin/elasticsearch-certutil cert --silent --pem -out config/certs/kafka-certs.zip --in config/certs/kafka-instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key;
+          unzip -o config/certs/kafka-certs.zip -d config/certs;
+        fi;
+        if [ ! -f config/certs/kafka/kafka.keystore.p12 ]; then
+          echo "Creating Kafka PKCS12 keystore";
+          bin/elasticsearch-certutil cert --silent -out config/certs/kafka-keystore.zip --in config/certs/kafka-instances.yml --ca-cert config/certs/ca/ca.crt --ca-key config/certs/ca/ca.key --pass "${KAFKA_SSL_KEYSTORE_PASSWORD:-kafkademo}";
+          unzip -o config/certs/kafka-keystore.zip -d config/certs/kafka-keystore;
+          mv config/certs/kafka-keystore/kafka/kafka.p12 config/certs/kafka/kafka.keystore.p12;
+          rm -rf config/certs/kafka-keystore config/certs/kafka-keystore.zip;
+        fi;
+        printf "%s" "${KAFKA_SSL_KEYSTORE_PASSWORD:-kafkademo}" > config/certs/kafka/kafka_creds;
+        printf "security.protocol=SSL\nssl.truststore.type=PEM\nssl.truststore.location=/certs/ca/ca.crt\n" > config/certs/kafka/client-ssl.properties;
         echo "Setting file permissions"
         chown -R root:root config/certs;
         find . -type d -exec chmod 755 \{\} \;;
@@ -93,7 +124,7 @@ services:
         echo "All done!";
       '
     healthcheck:
-      test: ["CMD-SHELL", "[ -f config/certs/es01/es01.crt ]"]
+      test: ["CMD-SHELL", "[ -f config/certs/es01/es01.crt ] && [ -f config/certs/kafka/kafka.keystore.p12 ]"]
       interval: 1s
       timeout: 5s
       retries: 120
