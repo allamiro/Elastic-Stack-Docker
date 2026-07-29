@@ -13,11 +13,15 @@ services:
           echo "Set the KIBANA_PASSWORD environment variable in the .env file";
           exit 1;
         fi;
-        if [ ! -f config/certs/ca.zip ]; then
+        if [ -f config/certs/ca/ca.crt ] && [ -f config/certs/ca/ca.key ] && [ ! -f config/certs/ca.zip ]; then
+          echo "Using provided external CA (see docs/external-ca.md)";
+        elif [ ! -f config/certs/ca.zip ]; then
           echo "Creating CA";
           bin/elasticsearch-certutil ca --silent --pem -out config/certs/ca.zip;
           unzip config/certs/ca.zip -d config/certs;
-          cat config/certs/ca/ca.crt config/certs/ca/ca.key > config/certs/ca/ca.pem
+        fi;
+        if [ ! -f config/certs/ca/ca.pem ]; then
+          cat config/certs/ca/ca.crt config/certs/ca/ca.key > config/certs/ca/ca.pem;
         fi;
         if [ ! -f config/certs/certs.zip ]; then
           echo "Creating certs";
