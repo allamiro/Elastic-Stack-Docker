@@ -445,6 +445,7 @@ The agent profile enables comprehensive container monitoring:
 - **Transport Layer**: Encrypted node-to-node communication
 - **HTTP Layer**: Encrypted client-to-cluster communication
 - **Certificate Management**: Automated CA and certificate generation
+- **External CA Support**: Bring your own certificate authority instead of the self-generated one — see [Using an External Certificate Authority](docs/external-ca.md) for fresh installs, replacing self-generated certificates after a first run, and the per-profile impact (including Kafka)
 
 ### X-Pack Security
 
@@ -497,7 +498,7 @@ docker compose down -v
 docker compose up -d
 ```
 
-**Note**: Certificates are stored in Docker volumes, not in local directories. To regenerate certificates, you must remove the volume containing the certificates and restart the stack.
+**Note**: Certificates are stored in Docker volumes, not in local directories. To regenerate certificates, you must remove the volume containing the certificates and restart the stack. To regenerate them from your own CA — or to remove only the certs volume without deleting data volumes — follow [Using an External Certificate Authority](docs/external-ca.md).
 
 #### 3. Port Conflicts
 
